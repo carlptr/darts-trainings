@@ -128,4 +128,11 @@ document.getElementById('delete-confirm').onclick=deleteGame;
 
 document.getElementById('new').onclick=newGame;
 document.getElementById('game-list').addEventListener('change',e=>switchGame(e.target.value));
-document.getElementById('print').onclick=()=>window.print();render();
+document.getElementById('print').onclick=()=>{document.body.classList.remove('print-results');window.print()};
+document.getElementById('print-results').onclick=()=>{
+const cleanup=()=>document.body.classList.remove('print-results');
+document.body.classList.add('print-results');
+window.addEventListener('afterprint',cleanup,{once:true});
+window.print();
+};
+render();
