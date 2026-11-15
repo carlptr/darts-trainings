@@ -1,8 +1,8 @@
-# Darts-Trainings
+# Darts Trainings
 
-Eine Sammlung browserbasierter Darts-Trainings. Die Seiten funktionieren ohne Build-Schritt und können direkt über GitHub Pages veröffentlicht werden.
+A collection of browser-based darts training games. The pages require no build step and can be published directly with GitHub Pages.
 
-## Projektstruktur
+## Project structure
 
 ```text
 .
@@ -20,16 +20,16 @@ Eine Sammlung browserbasierter Darts-Trainings. Die Seiten funktionieren ohne Bu
 └── README.md
 ```
 
-`index.html` ist die Trainingsübersicht. Jedes Trainingsformat erhält einen eigenen Ordner unter `trainings/`. Gemeinsame Gestaltung gehört nach `assets/css/main.css`, formatbezogene Gestaltung und Logik in eigene Dateien unter `assets/css/` und `assets/js/`.
+`index.html` is the training overview. Each training format has its own directory under `trainings/`. Shared styles belong in `assets/css/main.css`; format-specific styles and logic belong in separate files under `assets/css/` and `assets/js/`.
 
-## Lokal ansehen
+## Run locally
 
-`index.html` im Browser öffnen. Für die aktuelle Version ist kein Server und kein Build-Schritt erforderlich.
+Open `index.html` in a browser. The current version does not require a server or build step.
 
-## Mit GitHub Pages veröffentlichen
+## Publish with GitHub Pages
 
-1. Das Projekt in ein GitHub-Repository übertragen.
-2. Unter **Settings → Pages** die Veröffentlichung aus dem gewünschten Branch und dessen Stammverzeichnis aktivieren.
-3. Die von GitHub angezeigte Website-Adresse öffnen.
+1. Push the project to a GitHub repository.
+2. Under **Settings → Pages**, enable publishing from the desired branch and its root directory.
+3. Open the website URL provided by GitHub.
 
-Die Trainings speichern Ergebnisse aktuell lokal im Browser des jeweiligen Geräts. Es gibt keine Synchronisierung zwischen Geräten.
+Training results are currently stored locally in the browser on the device being used. They are not synchronized across devices.
