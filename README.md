@@ -24,7 +24,9 @@ A collection of browser-based darts training games. The pages require no build s
 
 ## Run locally
 
-Open `index.html` in a browser. The current version does not require a server or build step.
+Open the root `index.html` in a browser. The current version does not require a build step.
+
+For testing through a local web server, open the root `index.html` in VS Code, right-click it, and select **Open with Live Server** (requires the Live Server extension). This is recommended for consistent browser storage behavior.
 
 ## Publish with GitHub Pages
 
@@ -33,3 +35,7 @@ Open `index.html` in a browser. The current version does not require a server or
 3. Open the website URL provided by GitHub.
 
 Training results are currently stored locally in the browser on the device being used. They are not synchronized across devices.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
