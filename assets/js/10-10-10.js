@@ -33,7 +33,7 @@ const container=document.getElementById('disciplines');
 container.replaceChildren();
 kinds.forEach((k,idx)=>{
 const sec=document.createElement('section');
-sec.innerHTML='<div class="section-head"><span class="num">0'+(idx+1)+'</span><h2>'+disciplineNames[idx]+'</h2><span class="hint">'+disciplineHints[idx]+'</span></div><details class="discipline-help"><summary>Ablauf &amp; Ziel</summary><p>'+disciplineExplanations[idx]+'</p></details><div class="scroll"><table><thead><tr><th>Spieler*in / Ziel</th></tr></thead><tbody></tbody></table></div>';
+sec.innerHTML='<div class="section-head"><span class="num">0'+(idx+1)+'</span><h2>'+disciplineNames[idx]+'</h2><span class="hint">'+disciplineHints[idx]+'</span></div><details class="discipline-help"><summary>Ablauf &amp; Ziel</summary><p>'+disciplineExplanations[idx]+'</p></details><div class="scroll"><table><thead><tr><th>Spieler*in / '+(k==='scoring'?'Aufnahme':'Ziel')+'</th></tr></thead><tbody></tbody></table></div>';
 sec.querySelector('.discipline-help summary').tabIndex=kinds.indexOf(k)*20+1;
 const head=sec.querySelector('tr');
 (k==='scoring'?Array.from({length:10},(_,i)=>i+1):state[k]).forEach(n=>{
