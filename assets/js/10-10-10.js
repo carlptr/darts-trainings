@@ -401,7 +401,8 @@ return;
 }
 const step=steps[stepIndex],names=['Singles','Scoring','Checkouts'],task=step.k==='scoring'?'Aufnahme '+(step.i+1):'Ziel '+state[step.k][step.i];
 title.textContent=names[kinds.indexOf(step.k)]+' · '+task;
-context.textContent=(step.k==='scoring'?'Zielzahl '+scoringTargetsFor(state)[step.p]+' · ':'')+(correctionSession?'Korrekturmodus':'Wert auswählen');
+const prompts={rtw:'Treffer auswählen',scoring:'Punkte auswählen',checkout:'Gechecked?'};
+context.textContent=(correctionSession?'Korrekturmodus · ':'')+(step.k==='scoring'?'Zielzahl '+scoringTargetsFor(state)[step.p]+' · ':'')+prompts[step.k];
 for(let p=0;p<2;p++){
 const suffix=p?'b':'a',card=document.getElementById('guided-player-'+suffix),active=step.p===p,previousIndex=step.i-(step.p===1&&p===0?0:1),previous=previousIndex>=0?state.scores[step.k][p][previousIndex]:'';
 document.getElementById('guided-name-'+suffix).textContent=player(p);
