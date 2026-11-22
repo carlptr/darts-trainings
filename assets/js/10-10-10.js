@@ -33,7 +33,7 @@ const legacy=[18,19,20].includes(game.scoringTarget)?game.scoringTarget:20;
 game.scoringTargets=[legacy,legacy];
 }
 function loadLibrary(){try{const data=JSON.parse(localStorage.getItem(LIBRARY_KEY));if(data&&Array.isArray(data.games)){const games=data.games.filter(r=>r&&typeof r.id==='string'&&typeof r.createdAt==='string'&&typeof r.updatedAt==='string'&&valid(r.game));if(games.length){games.forEach(r=>normalizeScoringTargets(r.game));return {activeId:games.some(r=>r.id===data.activeId)?data.activeId:games[0].id,games}}}}catch{}let old;try{old=JSON.parse(localStorage.getItem(KEY))}catch{}const oldGame=valid(old)?old:fresh();normalizeScoringTargets(oldGame);const record=makeRecord(oldGame);return {activeId:record.id,games:[record]}}
-let library=loadLibrary(),state=library.games.find(r=>r.id===library.activeId).game,correctionSession=null,playerDataEditing=false;
+let library=loadLibrary(),state=library.games.find(r=>r.id===library.activeId).game,correctionSession=null,playerDataEditing=false,guidedStep=null;
 for(const r of library.games){r.startedAt=r.startedAt||r.createdAt;if(typeof r.wasComplete!=='boolean')r.wasComplete=isComplete(r.game);r.endedAt=r.endedAt||null;}
 function save(){if(correctionSession)return;const record=library.games.find(r=>r.id===library.activeId);record.game=state;record.updatedAt=new Date().toISOString();const done=isComplete(state);if(done&&!record.wasComplete)record.endedAt=record.updatedAt;if(!done)record.endedAt=null;record.wasComplete=done;try{localStorage.setItem(LIBRARY_KEY,JSON.stringify(library));document.getElementById('status').textContent='✓ '+library.games.length+' Spiel'+(library.games.length===1?'':'e')+' lokal gespeichert'}catch{document.getElementById('status').textContent='Speichern fehlgeschlagen – Ergebnisse bitte drucken'}renderGameList();renderResults()}
 function renderGameList(){const list=document.getElementById('game-list');list.replaceChildren();library.games.forEach((r,index)=>{const g=r.game,done=kinds.every(k=>g.scores[k].every(row=>row.every(v=>v!==''))),option=document.createElement('option');option.value=r.id;option.textContent='Spiel '+(index+1)+' · '+(g.nameA.trim()||'Spieler*in A')+' gegen '+(g.nameB.trim()||'Spieler*in B')+' · '+new Date(r.createdAt).toLocaleDateString('de-DE')+' · '+(done?'Abgeschlossen':'In Bearbeitung');list.append(option)});list.value=library.activeId;const current=library.games.find(r=>r.id===library.activeId);document.getElementById('game-info').textContent='Start: '+formatTime(current.startedAt)+' · Ende: '+(current.endedAt?formatTime(current.endedAt):isComplete(current.game)?'Nicht erfasst':'Noch offen')+' · '+library.games.length+' gespeicherte Spiele'}
@@ -160,6 +160,8 @@ const totals=pts.map(a=>a.reduce((s,v)=>s+(v||0),0));
 document.getElementById('result').textContent=complete===3?(totals[0]===totals[1]?'Unentschieden – starkes Match!':player(totals[0]>totals[1]?0:1)+' gewinnt das Match!'):complete+' von 3 Disziplinen abgeschlossen';
 const editing=Boolean(correctionSession||playerDataEditing);
 document.getElementById('new').disabled=editing;document.getElementById('game-list').disabled=editing;document.getElementById('print').disabled=editing;document.getElementById('print-results').disabled=editing;
+refreshGuidedEntryButton();
+if(document.getElementById('guided-dialog').open)renderGuidedEntry();
 }
 for(let p=0;p<2;p++){
 const id=p?'nameB':'nameA';
@@ -279,7 +281,7 @@ actions.append(startNext);
 }
 }
 function renderDisciplineActions(){kinds.forEach(kind=>{const host=document.querySelector('[data-actions-for="'+kind+'"]');if(!host)return;host.replaceChildren();const lifecycle=lifecycleFor(state),activeIndex=lifecycle.status==='active'?kinds.indexOf(lifecycle.activeKind):-1,kindIndex=kinds.indexOf(kind),status=document.createElement('span');status.className='lifecycle-readonly';if(lifecycle.status==='setup')status.textContent='Noch nicht gestartet';else if(lifecycle.status==='completed')status.textContent='Read-only';else if(lifecycle.status==='active')status.textContent=kindIndex===activeIndex?'Aktiv':kindIndex<activeIndex?'Read-only':'Noch nicht begonnen';else status.textContent='Status festlegen';host.append(status);if(correctionSession){if(correctionSession.kind!==kind)return;const saveButton=document.createElement('button');saveButton.className='primary';saveButton.textContent='Korrektur speichern';saveButton.onclick=saveCorrection;const cancelButton=document.createElement('button');cancelButton.textContent='Abbrechen';cancelButton.onclick=cancelCorrection;host.append(saveButton,cancelButton);return}if(playerDataEditing)return;const lockedPast=lifecycle.status==='completed'||lifecycle.status==='active'&&kindIndex<=activeIndex,hasValues=state.scores[kind].some(row=>row.some(value=>value!==''));if(!lockedPast||!hasValues)return;const edit=document.createElement('button');edit.textContent='✎ Korrigieren';edit.setAttribute('aria-label',disciplineNames[kindIndex]+' korrigieren');edit.onclick=()=>beginCorrection(kind);host.append(edit)})}
-function beginCorrection(kind){if(correctionSession||playerDataEditing)return;correctionSession={kind,snapshot:state.scores[kind].map(row=>row.slice())};update()}
+function beginCorrection(kind){if(correctionSession||playerDataEditing)return;correctionSession={kind,snapshot:state.scores[kind].map(row=>row.slice()),lifecycle:{...lifecycleFor(state)}};update()}
 function reconcileLifecycleAfterCorrection(){
 if(lifecycleFor(state).status==='completed'||isComplete(state)){
 if(isComplete(state)){state.lifecycle={status:'completed',activeKind:null};return}
@@ -288,13 +290,13 @@ if(nextIncomplete)state.lifecycle={status:'active',activeKind:nextIncomplete};
 }
 }
 function saveCorrection(){
-if(!correctionSession)return;
+if(!correctionSession)return false;
 const {kind,snapshot}=correctionSession;
 for(let p=0;p<2;p++){
 for(let i=0;i<10;i++){
 if(snapshot[p][i]!==''&&state.scores[kind][p][i]===''){
 document.getElementById('status').textContent='Korrektur nicht gespeichert: vorhandene Werte dürfen nicht leer bleiben.';
-return;
+return false;
 }
 }
 }
@@ -302,8 +304,9 @@ correctionSession=null;
 reconcileLifecycleAfterCorrection();
 save();
 update();
+return true;
 }
-function cancelCorrection(){if(!correctionSession)return;state.scores[correctionSession.kind]=correctionSession.snapshot;correctionSession=null;update()}
+function cancelCorrection(){if(!correctionSession)return;state.scores[correctionSession.kind]=correctionSession.snapshot;state.lifecycle=correctionSession.lifecycle;correctionSession=null;update()}
 function beginPlayerDataEdit(){
 if(playerDataEditing||correctionSession||lifecycleFor(state).status==='setup'||lifecycleFor(state).status==='legacy')return;
 playerDataEditing=true;
@@ -327,6 +330,123 @@ playerDataEditing=false;
 update();document.getElementById('player-data-edit').focus();
 }
 function nextEntry(k,p,i){if(p===0)return {k,p:1,i};if(i<9)return {k,p:0,i:i+1};const next=kinds[kinds.indexOf(k)+1];return next?{k:next,p:0,i:0}:null}
+function allGuidedSteps(){return kinds.flatMap(k=>Array.from({length:10},(_,i)=>[0,1].map(p=>({k,p,i}))).flat())}
+function guidedSteps(){
+if(correctionSession)return allGuidedSteps().filter(step=>step.k===correctionSession.kind);
+const lifecycle=lifecycleFor(state);
+const kind=lifecycle.status==='setup'?'rtw':lifecycle.status==='active'?lifecycle.activeKind:null;
+return kind?allGuidedSteps().filter(step=>step.k===kind):[];
+}
+function guidedValue(step){return state.scores[step.k][step.p][step.i]}
+function firstGuidedStep(steps){
+if(correctionSession)return steps.find(step=>guidedValue(step)!=='')||steps[0]||null;
+return steps.find(step=>guidedValue(step)==='')||steps[0]||null;
+}
+function refreshGuidedEntryButton(){
+const button=document.getElementById('guided-open'),lifecycle=lifecycleFor(state);
+button.disabled=playerDataEditing||lifecycle.status==='legacy'||(lifecycle.status==='completed'&&!correctionSession);
+button.textContent=correctionSession?'Geführt korrigieren':'Geführt spielen';
+}
+function openGuidedEntry(){
+if(playerDataEditing||lifecycleFor(state).status==='legacy'||(lifecycleFor(state).status==='completed'&&!correctionSession))return;
+const steps=guidedSteps();
+if(!steps.length)return;
+guidedStep=firstGuidedStep(steps);
+document.getElementById('guided-feedback').textContent='';
+const dialog=document.getElementById('guided-dialog');
+if(!dialog.open)dialog.showModal();
+renderGuidedEntry();
+const firstChoice=document.querySelector('#guided-choices button:not(:disabled)');
+(firstChoice||document.getElementById('guided-close')).focus();
+}
+function renderGuidedEntry(){
+const dialog=document.getElementById('guided-dialog');
+if(!dialog.open)return;
+const title=document.getElementById('guided-title'),context=document.getElementById('guided-context'),choices=document.getElementById('guided-choices');
+const steps=guidedSteps(),stepIndex=steps.findIndex(step=>step.k===guidedStep?.k&&step.p===guidedStep?.p&&step.i===guidedStep?.i);
+const globalSteps=allGuidedSteps(),globalIndex=globalSteps.findIndex(step=>step.k===guidedStep?.k&&step.p===guidedStep?.p&&step.i===guidedStep?.i);
+const complete=lifecycleFor(state).status==='completed'&&!correctionSession;
+const feedback=document.getElementById('guided-feedback');
+document.getElementById('guided-back').disabled=stepIndex<=0;
+document.getElementById('guided-next').hidden=false;
+document.getElementById('guided-correction-save').hidden=!correctionSession;
+document.getElementById('guided-correction-cancel').hidden=!correctionSession;
+const progressTotal=correctionSession?steps.length:globalSteps.length,progressIndex=correctionSession?stepIndex:globalIndex;
+document.getElementById('guided-progress').max=progressTotal;
+document.getElementById('guided-progress').value=progressIndex<0?0:progressIndex+1;
+document.getElementById('guided-progress-label').textContent=progressIndex<0?'':(correctionSession?'Korrektur · ':'')+'Aufgabe '+(progressIndex+1)+' von '+progressTotal;
+choices.replaceChildren();
+if(complete){
+title.textContent='Match abgeschlossen';
+context.textContent='Alle Aufgaben sind erfasst. Die Matchwertung und Ergebnisse wurden gespeichert.';
+feedback.textContent='';
+choices.hidden=true;
+document.getElementById('guided-back').hidden=true;
+document.getElementById('guided-next').hidden=true;
+return;
+}
+document.getElementById('guided-back').hidden=false;
+if(stepIndex<0){
+title.textContent='Keine bearbeitbare Aufgabe';
+context.textContent=correctionSession?'In dieser Disziplin ist keine Aufgabe verfügbar.':'Bitte zuerst den Status dieses älteren Spiels festlegen.';
+choices.hidden=true;
+document.getElementById('guided-back').hidden=true;
+document.getElementById('guided-next').hidden=true;
+return;
+}
+const step=steps[stepIndex],names=['Singles','Scoring','Checkouts'],task=step.k==='scoring'?'Aufnahme '+(step.i+1):'Ziel '+state[step.k][step.i];
+title.textContent=names[kinds.indexOf(step.k)]+' · '+task;
+context.textContent=player(step.p)+(step.k==='scoring'?' · Zielzahl '+scoringTargetsFor(state)[step.p]:'')+' · '+(correctionSession?'Korrekturmodus':'Eingabe');
+document.getElementById('guided-name-a').textContent=player(0);
+document.getElementById('guided-name-b').textContent=player(1);
+document.getElementById('guided-score-a').textContent=state.scores[step.k][0].reduce((sum,value)=>sum+(value===''?0:value),0);
+document.getElementById('guided-score-b').textContent=state.scores[step.k][1].reduce((sum,value)=>sum+(value===''?0:value),0);
+choices.hidden=false;
+choices.className='guided-choices '+step.k;
+choices.setAttribute('aria-label',step.k==='checkout'?'Checkout-Ergebnis wählen':names[kinds.indexOf(step.k)]+'-Punktzahl wählen');
+const values=step.k==='rtw'?[0,1,2,3]:step.k==='scoring'?[0,1,2,3,4,5,6,7,8,9]:[1,0];
+values.forEach(value=>{
+const button=document.createElement('button');
+button.type='button';
+button.dataset.value=String(value);
+button.setAttribute('aria-pressed',String(guidedValue(step)===value));
+button.setAttribute('aria-label',step.k==='checkout'?(value===1?'Ja, Checkout getroffen':'Nein, Checkout nicht getroffen'):String(value)+' Punkte');
+button.textContent=step.k==='checkout'?(value===1?'✓ Getroffen':'✕ Nicht getroffen'):String(value);
+button.disabled=!canEditCell(step.k,step.p,step.i);
+button.addEventListener('click',()=>recordGuidedValue(value));
+choices.append(button);
+});
+const currentValue=guidedValue(step);
+document.getElementById('guided-next').disabled=currentValue===''||stepIndex>=steps.length-1;
+document.getElementById('guided-back').disabled=stepIndex<=0;
+feedback.textContent=correctionSession?'Änderungen werden erst mit „Korrektur speichern“ übernommen.':'Eingabe wird sofort im Match gespeichert.';
+}
+function recordGuidedValue(value){
+if(!guidedStep||!canEditCell(guidedStep.k,guidedStep.p,guidedStep.i))return;
+const step=guidedStep,kind=step.k;
+if(!Number.isInteger(value)||(kind==='rtw'&&(value<0||value>3))||(kind==='scoring'&&(value<0||value>9))||(kind==='checkout'&&value!==0&&value!==1))return;
+const currentSteps=guidedSteps(),stepIndex=currentSteps.findIndex(entry=>entry.k===step.k&&entry.p===step.p&&entry.i===step.i);
+let next=correctionSession?currentSteps[stepIndex+1]:allGuidedSteps()[allGuidedSteps().findIndex(entry=>entry.k===step.k&&entry.p===step.p&&entry.i===step.i)+1];
+ensureMatchStarted(kind);
+state.scores[kind][step.p][step.i]=value;
+update();
+save();
+if(next&&canEditCell(next.k,next.p,next.i))guidedStep=next;
+renderGuidedEntry();
+const firstChoice=document.querySelector('#guided-choices button:not(:disabled)');
+(firstChoice||document.getElementById('guided-close')).focus();
+}
+function moveGuided(direction){
+if(!guidedStep)return;
+const steps=guidedSteps(),index=steps.findIndex(step=>step.k===guidedStep.k&&step.p===guidedStep.p&&step.i===guidedStep.i),next=steps[index+direction];
+if(!next||!canEditCell(next.k,next.p,next.i))return;
+if(direction>0&&guidedValue(guidedStep)==='')return;
+guidedStep=next;
+document.getElementById('guided-feedback').textContent='';
+renderGuidedEntry();
+const firstChoice=document.querySelector('#guided-choices button:not(:disabled)');
+if(firstChoice)firstChoice.focus();
+}
 function focusNext(k,p,i){const n=nextEntry(k,p,i);if(!n)return;const input=Array.from(document.querySelectorAll('.score-input')).find(el=>el.dataset.kind===n.k&&Number(el.dataset.p)===n.p&&Number(el.dataset.i)===n.i);if(input&&(input.disabled||input.readOnly))return;if(input){input.focus();if(input.type==='number')input.select()}}
 function focusFirstEntry(kind){
 const input=Array.from(document.querySelectorAll('.score-input')).find(el=>el.dataset.kind===kind&&Number(el.dataset.p)===0&&el.dataset.i==='0');
@@ -358,6 +478,33 @@ if(e.key==='Escape'){e.preventDefault();cancelPlayerDataEdit()}
 document.getElementById('player-data-edit').onclick=beginPlayerDataEdit;
 document.getElementById('player-data-save').onclick=savePlayerData;
 document.getElementById('player-data-cancel').onclick=cancelPlayerDataEdit;
+const guidedDialog=document.getElementById('guided-dialog');
+document.getElementById('guided-open').onclick=openGuidedEntry;
+document.getElementById('guided-close').onclick=()=>guidedDialog.close();
+document.getElementById('guided-back').onclick=()=>moveGuided(-1);
+document.getElementById('guided-next').onclick=()=>moveGuided(1);
+document.getElementById('guided-correction-cancel').onclick=()=>guidedDialog.close();
+document.getElementById('guided-correction-save').onclick=()=>{
+if(saveCorrection())guidedDialog.close();
+else document.getElementById('guided-feedback').textContent='Korrektur konnte nicht gespeichert werden. Bitte leere vorhandene Werte nicht.';
+};
+guidedDialog.addEventListener('close',()=>{
+if(correctionSession)cancelCorrection();
+guidedStep=null;
+});
+guidedDialog.addEventListener('cancel',()=>{
+if(correctionSession)cancelCorrection();
+});
+guidedDialog.addEventListener('keydown',event=>{
+if(!guidedDialog.open)return;
+if(event.key==='Escape'){event.preventDefault();if(correctionSession)cancelCorrection();guidedDialog.close();return}
+if(event.key==='ArrowLeft'){event.preventDefault();moveGuided(-1);return}
+if(event.key==='ArrowRight'){event.preventDefault();moveGuided(1);return}
+if(/^\d$/.test(event.key)){
+const choice=Array.from(document.querySelectorAll('#guided-choices button')).find(button=>button.dataset.value===event.key&&!button.disabled);
+if(choice){event.preventDefault();choice.click()}
+}
+});
 document.getElementById('new').onclick=newGame;
 document.getElementById('game-list').addEventListener('change',e=>switchGame(e.target.value));
 document.getElementById('print').onclick=()=>{if(correctionSession||playerDataEditing)return;document.body.classList.remove('print-results');window.print()};
