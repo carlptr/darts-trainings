@@ -403,7 +403,7 @@ const step=steps[stepIndex],names=['Singles','Scoring','Checkouts'],task=step.k=
 title.textContent=names[kinds.indexOf(step.k)]+' · '+task;
 context.textContent=(step.k==='scoring'?'Zielzahl '+scoringTargetsFor(state)[step.p]+' · ':'')+(correctionSession?'Korrekturmodus':'Wert auswählen');
 for(let p=0;p<2;p++){
-const suffix=p?'b':'a',card=document.getElementById('guided-player-'+suffix),active=step.p===p,previous=step.i>0?state.scores[step.k][p][step.i-1]:'';
+const suffix=p?'b':'a',card=document.getElementById('guided-player-'+suffix),active=step.p===p,previousIndex=step.i-(step.p===1&&p===0?0:1),previous=previousIndex>=0?state.scores[step.k][p][previousIndex]:'';
 document.getElementById('guided-name-'+suffix).textContent=player(p);
 document.getElementById('guided-turn-'+suffix).hidden=!active;
 document.getElementById('guided-previous-'+suffix).textContent=formatGuidedValue(step.k,previous);
