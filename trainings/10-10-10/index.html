@@ -28,8 +28,11 @@
 <dialog id="guided-dialog" aria-labelledby="guided-title" aria-describedby="guided-context">
 <div class="guided-header"><div><p class="eyebrow">10–10–10 · GEFÜHRTES MATCH</p><h2 id="guided-title">Aufgabe</h2></div><button id="guided-close" type="button" aria-label="Geführtes Match schließen">Schließen</button></div>
 <p id="guided-context"></p>
-<div class="guided-progress"><progress id="guided-progress" max="60" value="0" aria-label="Matchfortschritt"></progress><span id="guided-progress-label"></span></div>
-<div class="guided-scores" aria-label="Zwischenstand dieser Disziplin"><div><span id="guided-name-a">Spieler*in A</span><strong id="guided-score-a">0</strong></div><div><span id="guided-name-b">Spieler*in B</span><strong id="guided-score-b">0</strong></div></div>
+<div class="guided-progress"><progress id="guided-progress" max="10" value="0" aria-label="Fortschritt in dieser Disziplin"></progress><span id="guided-progress-label"></span></div>
+<div class="guided-scores" aria-label="Zwischenstand und letzte Eingabe dieser Disziplin">
+<div class="guided-player" id="guided-player-a"><div class="guided-player-meta"><div class="guided-player-heading"><span id="guided-name-a">Spieler*in A</span><span id="guided-turn-a" class="guided-turn" hidden>Am Zug</span></div><small>Vorherige Eingabe: <strong id="guided-previous-a">–</strong></small></div><strong id="guided-score-a" class="guided-total">0</strong></div>
+<div class="guided-player" id="guided-player-b"><div class="guided-player-meta"><div class="guided-player-heading"><span id="guided-name-b">Spieler*in B</span><span id="guided-turn-b" class="guided-turn" hidden>Am Zug</span></div><small>Vorherige Eingabe: <strong id="guided-previous-b">–</strong></small></div><strong id="guided-score-b" class="guided-total">0</strong></div>
+</div>
 <p id="guided-feedback" role="status" aria-live="polite"></p>
 <div id="guided-choices" class="guided-choices" role="group" aria-label="Wert für diese Aufgabe auswählen"></div>
 <div class="guided-actions"><button id="guided-back" type="button">← Zurück</button><div><button id="guided-correction-cancel" type="button" hidden>Korrektur abbrechen</button><button id="guided-correction-save" class="primary" type="button" hidden>Korrektur speichern</button><button id="guided-next" class="primary" type="button">Weiter →</button></div></div>

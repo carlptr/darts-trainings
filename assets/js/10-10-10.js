@@ -338,6 +338,7 @@ const kind=lifecycle.status==='setup'?'rtw':lifecycle.status==='active'?lifecycl
 return kind?allGuidedSteps().filter(step=>step.k===kind):[];
 }
 function guidedValue(step){return state.scores[step.k][step.p][step.i]}
+function formatGuidedValue(kind,value){return value===''?'–':kind==='checkout'?(value===1?'✓ Getroffen':'✕ Nicht getroffen'):String(value)}
 function firstGuidedStep(steps){
 if(correctionSession)return steps.find(step=>guidedValue(step)!=='')||steps[0]||null;
 return steps.find(step=>guidedValue(step)==='')||steps[0]||null;
@@ -364,19 +365,23 @@ const dialog=document.getElementById('guided-dialog');
 if(!dialog.open)return;
 const title=document.getElementById('guided-title'),context=document.getElementById('guided-context'),choices=document.getElementById('guided-choices');
 const steps=guidedSteps(),stepIndex=steps.findIndex(step=>step.k===guidedStep?.k&&step.p===guidedStep?.p&&step.i===guidedStep?.i);
-const globalSteps=allGuidedSteps(),globalIndex=globalSteps.findIndex(step=>step.k===guidedStep?.k&&step.p===guidedStep?.p&&step.i===guidedStep?.i);
 const complete=lifecycleFor(state).status==='completed'&&!correctionSession;
 const feedback=document.getElementById('guided-feedback');
 document.getElementById('guided-back').disabled=stepIndex<=0;
 document.getElementById('guided-next').hidden=false;
 document.getElementById('guided-correction-save').hidden=!correctionSession;
 document.getElementById('guided-correction-cancel').hidden=!correctionSession;
-const progressTotal=correctionSession?steps.length:globalSteps.length,progressIndex=correctionSession?stepIndex:globalIndex;
-document.getElementById('guided-progress').max=progressTotal;
-document.getElementById('guided-progress').value=progressIndex<0?0:progressIndex+1;
-document.getElementById('guided-progress-label').textContent=progressIndex<0?'':(correctionSession?'Korrektur · ':'')+'Aufgabe '+(progressIndex+1)+' von '+progressTotal;
+document.getElementById('guided-progress').max=10;
+document.getElementById('guided-progress').value=guidedStep?guidedStep.i+1:0;
+document.getElementById('guided-progress-label').textContent=guidedStep?(correctionSession?'Korrektur · ':'')+'Aufgabe '+(guidedStep.i+1)+' von 10':'';
 choices.replaceChildren();
 if(complete){
+for(const suffix of ['a','b']){
+const card=document.getElementById('guided-player-'+suffix);
+card.classList.remove('is-active');
+card.removeAttribute('aria-current');
+document.getElementById('guided-turn-'+suffix).hidden=true;
+}
 title.textContent='Match abgeschlossen';
 context.textContent='Alle Aufgaben sind erfasst. Die Matchwertung und Ergebnisse wurden gespeichert.';
 feedback.textContent='';
@@ -396,11 +401,17 @@ return;
 }
 const step=steps[stepIndex],names=['Singles','Scoring','Checkouts'],task=step.k==='scoring'?'Aufnahme '+(step.i+1):'Ziel '+state[step.k][step.i];
 title.textContent=names[kinds.indexOf(step.k)]+' · '+task;
-context.textContent=player(step.p)+(step.k==='scoring'?' · Zielzahl '+scoringTargetsFor(state)[step.p]:'')+' · '+(correctionSession?'Korrekturmodus':'Eingabe');
-document.getElementById('guided-name-a').textContent=player(0);
-document.getElementById('guided-name-b').textContent=player(1);
-document.getElementById('guided-score-a').textContent=state.scores[step.k][0].reduce((sum,value)=>sum+(value===''?0:value),0);
-document.getElementById('guided-score-b').textContent=state.scores[step.k][1].reduce((sum,value)=>sum+(value===''?0:value),0);
+context.textContent=(step.k==='scoring'?'Zielzahl '+scoringTargetsFor(state)[step.p]+' · ':'')+(correctionSession?'Korrekturmodus':'Wert auswählen');
+for(let p=0;p<2;p++){
+const suffix=p?'b':'a',card=document.getElementById('guided-player-'+suffix),active=step.p===p,previous=step.i>0?state.scores[step.k][p][step.i-1]:'';
+document.getElementById('guided-name-'+suffix).textContent=player(p);
+document.getElementById('guided-turn-'+suffix).hidden=!active;
+document.getElementById('guided-previous-'+suffix).textContent=formatGuidedValue(step.k,previous);
+document.getElementById('guided-score-'+suffix).textContent=state.scores[step.k][p].reduce((sum,value)=>sum+(value===''?0:value),0);
+card.classList.toggle('is-active',active);
+if(active)card.setAttribute('aria-current','true');
+else card.removeAttribute('aria-current');
+}
 choices.hidden=false;
 choices.className='guided-choices '+step.k;
 choices.setAttribute('aria-label',step.k==='checkout'?'Checkout-Ergebnis wählen':names[kinds.indexOf(step.k)]+'-Punktzahl wählen');

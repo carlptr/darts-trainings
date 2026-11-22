@@ -38,7 +38,7 @@ Training results are currently stored locally in the browser on the device being
 
 ## Guided 10–10–10 mode
 
-Select **Geführt spielen** in the 10–10–10 match to enter scores in a full-screen, touch-friendly view. The task order is deterministic: Singles, Scoring, then Checkouts; for each of the ten targets or turns, Player A enters a value followed by Player B, before moving to the next task. Entries use the same saved match data as the score table, results list, and print views.
+Select **Geführt spielen** in the 10–10–10 match to enter scores in a full-screen, touch-friendly view. The task order is deterministic: Singles, Scoring, then Checkouts; for each of the ten targets or turns, Player A enters a value followed by Player B, before moving to the next task. Progress counts the ten tasks in the current discipline, with both players sharing each task. Entries use the same saved match data as the score table, results list, and print views.
 
 Use the arrow keys to navigate, number keys to choose a score, and Escape to close the overlay. Locked disciplines can only be changed through their explicit correction mode; correction edits must be saved or are discarded when cancelled.
 

@@ -24,8 +24,14 @@
 .guided-progress{max-width:1100px;width:100%;margin:0 auto;display:flex;align-items:center;gap:14px;color:var(--muted);font-size:14px}
 .guided-progress progress{width:100%;height:14px;accent-color:var(--green)}
 .guided-scores{max-width:1100px;width:100%;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.guided-scores>div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 20px;border:1px solid var(--line);border-radius:10px;background:var(--card);font-size:clamp(16px,2.4vw,26px)}
-.guided-scores strong{color:var(--green);font-size:clamp(24px,4vw,42px)}
+.guided-player{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:14px 20px;border:1px solid var(--line);border-radius:10px;background:var(--card);font-size:clamp(16px,2.4vw,26px)}
+.guided-player.is-active{background:#26382b;border-color:var(--green);box-shadow:0 0 0 2px var(--green)}
+.guided-player-meta small{display:block;margin-top:6px;color:var(--muted);font-size:clamp(11px,1.4vw,15px)}
+.guided-player-meta small strong{color:#f2f5ed;font-size:1em}
+.guided-player-heading{display:flex;align-items:center;gap:10px}
+.guided-turn{padding:4px 8px;border-radius:20px;background:var(--green);color:#172011;font-size:11px;font-weight:800;white-space:nowrap}
+.guided-turn[hidden]{display:none}
+.guided-scores .guided-total{color:var(--green);font-size:clamp(24px,4vw,42px)}
 #guided-feedback{max-width:1100px;width:100%;min-height:24px;margin:0 auto;font-size:14px}
 .guided-choices{max-width:1100px;width:100%;margin:0 auto;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:clamp(8px,2vw,18px)}
 .guided-choices.rtw{grid-template-columns:repeat(4,minmax(0,1fr))}
@@ -38,4 +44,4 @@
 .guided-actions>div{display:flex;gap:10px}
 .guided-actions button{min-height:54px}
 .guided-help{max-width:1100px;width:100%;margin:0 auto;font-size:13px}
-@media(max-width:600px){#guided-dialog{padding:16px;gap:16px}.guided-header>button{min-width:0;padding:10px}.guided-scores>div{padding:10px 12px}.guided-choices{gap:8px}.guided-choices button{min-height:72px;padding:6px}.guided-actions button{padding:10px 12px}.guided-actions>div{gap:6px}.guided-help{margin-top:auto}}
+@media(max-width:600px){#guided-dialog{padding:16px;gap:16px}.guided-header>button{min-width:0;padding:10px}.guided-player{padding:10px 12px}.guided-player-heading{flex-wrap:wrap;gap:6px}.guided-turn{font-size:10px}.guided-choices{gap:8px}.guided-choices button{min-height:72px;padding:6px}.guided-actions button{padding:10px 12px}.guided-actions>div{gap:6px}.guided-help{margin-top:auto}}
