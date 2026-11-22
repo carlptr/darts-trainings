@@ -8,14 +8,15 @@ const disciplineExplanations=[
 'Checkt die 10 zufällig gezogenen Werte (41–60) mit höchstens drei Pfeilen je Checkout. Schüler*innen bis einschließlich 12 Jahre dürfen mit Single-Out beenden; für alle anderen gilt Double-Out. Erfolg zählt 1 Punkt, Fehlversuch 0.'
 ];
 function draw(min,max,n){const a=Array.from({length:max-min+1},(_,i)=>i+min);for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a.slice(0,n)}
-function fresh(names={}){return {checkoutStateVersion:2,nameA:names.nameA||'',nameB:names.nameB||'',rtw:draw(1,20,10),checkout:draw(41,60,10),lifecycle:{status:'setup',activeKind:null},scores:Object.fromEntries(kinds.map(k=>[k,[Array(10).fill(''),Array(10).fill('')]]))}}
-function valid(s){return s&&['rtw','checkout'].every(k=>Array.isArray(s[k])&&s[k].length===10&&new Set(s[k]).size===10&&s[k].every(n=>Number.isInteger(n)&&n>=(k==='rtw'?1:41)&&n<=(k==='rtw'?20:60)))&&kinds.every(k=>Array.isArray(s.scores?.[k])&&s.scores[k].length===2&&s.scores[k].every(a=>Array.isArray(a)&&a.length===10&&a.every(v=>v===''||Number.isInteger(v)&&v>=0&&v<=999)))&&['nameA','nameB'].every(k=>typeof s[k]==='string')}
+function fresh(names={}){return {checkoutStateVersion:2,nameA:names.nameA||'',nameB:names.nameB||'',scoringTargets:[20,20],rtw:draw(1,20,10),checkout:draw(41,60,10),lifecycle:{status:'setup',activeKind:null},scores:Object.fromEntries(kinds.map(k=>[k,[Array(10).fill(''),Array(10).fill('')]]))}}
+function valid(s){return s&&['rtw','checkout'].every(k=>Array.isArray(s[k])&&s[k].length===10&&new Set(s[k]).size===10&&s[k].every(n=>Number.isInteger(n)&&n>=(k==='rtw'?1:41)&&n<=(k==='rtw'?20:60)))&&kinds.every(k=>Array.isArray(s.scores?.[k])&&s.scores[k].length===2&&s.scores[k].every(a=>Array.isArray(a)&&a.length===10&&a.every(v=>v===''||Number.isInteger(v)&&v>=0&&v<=999)))&&['nameA','nameB'].every(k=>typeof s[k]==='string')&&(s.scoringTargets===undefined||Array.isArray(s.scoringTargets)&&s.scoringTargets.length===2&&s.scoringTargets.every(v=>v===null||[18,19,20].includes(v)))&&(s.scoringTarget===undefined||s.scoringTarget===null||[18,19,20].includes(s.scoringTarget))}
 
 function isComplete(game){return kinds.every(k=>game.scores[k].every(row=>row.every(v=>v!=='')))}
 function lifecycleFor(game){const lifecycle=game.lifecycle;if(!lifecycle||!['setup','active','completed'].includes(lifecycle.status)||(lifecycle.status==='active'&&!kinds.includes(lifecycle.activeKind))||(lifecycle.status!=='active'&&lifecycle.activeKind!==null))return {status:'legacy',activeKind:null};return lifecycle}
 function disciplineComplete(kind){return state.scores[kind].every(row=>row.every(value=>value!==''))}
 function canEditCell(kind,p,index){
 if(correctionSession)return correctionSession.kind===kind;
+if(playerDataEditing)return false;
 const lifecycle=lifecycleFor(state);
 if(lifecycle.status==='setup')return kind==='rtw';
 return lifecycle.status==='active'&&lifecycle.activeKind===kind;
@@ -26,8 +27,13 @@ state.lifecycle={status:'active',activeKind:'rtw'};
 }
 }
 function makeRecord(game){return {startedAt:new Date().toISOString(),endedAt:null,wasComplete:false,id:globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),game}}
-function loadLibrary(){try{const data=JSON.parse(localStorage.getItem(LIBRARY_KEY));if(data&&Array.isArray(data.games)){const games=data.games.filter(r=>r&&typeof r.id==='string'&&typeof r.createdAt==='string'&&typeof r.updatedAt==='string'&&valid(r.game));if(games.length)return {activeId:games.some(r=>r.id===data.activeId)?data.activeId:games[0].id,games}}}catch{}let old;try{old=JSON.parse(localStorage.getItem(KEY))}catch{}const record=makeRecord(valid(old)?old:fresh());return {activeId:record.id,games:[record]}}
-let library=loadLibrary(),state=library.games.find(r=>r.id===library.activeId).game,correctionSession=null,nameEditIndex=null;
+function normalizeScoringTargets(game){
+if(Array.isArray(game.scoringTargets)&&game.scoringTargets.length===2&&game.scoringTargets.every(v=>[18,19,20].includes(v)))return;
+const legacy=[18,19,20].includes(game.scoringTarget)?game.scoringTarget:20;
+game.scoringTargets=[legacy,legacy];
+}
+function loadLibrary(){try{const data=JSON.parse(localStorage.getItem(LIBRARY_KEY));if(data&&Array.isArray(data.games)){const games=data.games.filter(r=>r&&typeof r.id==='string'&&typeof r.createdAt==='string'&&typeof r.updatedAt==='string'&&valid(r.game));if(games.length){games.forEach(r=>normalizeScoringTargets(r.game));return {activeId:games.some(r=>r.id===data.activeId)?data.activeId:games[0].id,games}}}}catch{}let old;try{old=JSON.parse(localStorage.getItem(KEY))}catch{}const oldGame=valid(old)?old:fresh();normalizeScoringTargets(oldGame);const record=makeRecord(oldGame);return {activeId:record.id,games:[record]}}
+let library=loadLibrary(),state=library.games.find(r=>r.id===library.activeId).game,correctionSession=null,playerDataEditing=false;
 for(const r of library.games){r.startedAt=r.startedAt||r.createdAt;if(typeof r.wasComplete!=='boolean')r.wasComplete=isComplete(r.game);r.endedAt=r.endedAt||null;}
 function save(){if(correctionSession)return;const record=library.games.find(r=>r.id===library.activeId);record.game=state;record.updatedAt=new Date().toISOString();const done=isComplete(state);if(done&&!record.wasComplete)record.endedAt=record.updatedAt;if(!done)record.endedAt=null;record.wasComplete=done;try{localStorage.setItem(LIBRARY_KEY,JSON.stringify(library));document.getElementById('status').textContent='✓ '+library.games.length+' Spiel'+(library.games.length===1?'':'e')+' lokal gespeichert'}catch{document.getElementById('status').textContent='Speichern fehlgeschlagen – Ergebnisse bitte drucken'}renderGameList();renderResults()}
 function renderGameList(){const list=document.getElementById('game-list');list.replaceChildren();library.games.forEach((r,index)=>{const g=r.game,done=kinds.every(k=>g.scores[k].every(row=>row.every(v=>v!==''))),option=document.createElement('option');option.value=r.id;option.textContent='Spiel '+(index+1)+' · '+(g.nameA.trim()||'Spieler*in A')+' gegen '+(g.nameB.trim()||'Spieler*in B')+' · '+new Date(r.createdAt).toLocaleDateString('de-DE')+' · '+(done?'Abgeschlossen':'In Bearbeitung');list.append(option)});list.value=library.activeId;const current=library.games.find(r=>r.id===library.activeId);document.getElementById('game-info').textContent='Start: '+formatTime(current.startedAt)+' · Ende: '+(current.endedAt?formatTime(current.endedAt):isComplete(current.game)?'Nicht erfasst':'Noch offen')+' · '+library.games.length+' gespeicherte Spiele'}
@@ -36,17 +42,27 @@ function formatTime(value){return value&&Number.isFinite(Date.parse(value))?new 
 function resultFor(game){const disciplines=kinds.map(k=>{const done=game.scores[k].every(row=>row.every(v=>v!==''));const sums=game.scores[k].map(row=>row.reduce((a,v)=>a+(v===''?0:v),0));return {done,sums,points:done?(sums[0]===sums[1]?[1,1]:sums[0]>sums[1]?[2,0]:[0,2]):[0,0]}});return {disciplines,done:disciplines.every(d=>d.done),totals:[0,1].map(p=>disciplines.reduce((a,d)=>a+d.points[p],0))}}
 function renderResults(){const body=document.getElementById('results-body');body.replaceChildren();library.games.forEach((r,index)=>{const g=r.game,result=resultFor(g),nameA=g.nameA.trim()||'Spieler*in A',nameB=g.nameB.trim()||'Spieler*in B';const row=document.createElement('tr');const winner=!result.done?'In Bearbeitung':result.totals[0]===result.totals[1]?'Unentschieden':(result.totals[0]>result.totals[1]?nameA:nameB)+' gewinnt';const values=['Spiel '+(index+1)+' · '+nameA+' / '+nameB,formatTime(r.startedAt),r.endedAt?formatTime(r.endedAt):result.done?'Nicht erfasst':'Noch offen',...result.disciplines.map(d=>d.done?d.sums.join(' : '):'–'),result.done?result.totals.join(' : '):'–',winner];values.forEach(value=>{const td=document.createElement('td');td.textContent=value;row.append(td)});const td=document.createElement('td'),button=document.createElement('button');button.textContent=r.id===library.activeId?'Aktuell':'Anzeigen';button.disabled=r.id===library.activeId;button.onclick=()=>{switchGame(r.id);document.getElementById('game-list').focus()};td.append(button);const remove=document.createElement('button');remove.textContent='Löschen';remove.className='danger';remove.setAttribute('aria-label','Spiel von '+nameA+' und '+nameB+' löschen');remove.onclick=()=>askDelete(r.id);td.append(remove);row.append(td);body.append(row)})}
 
-function switchGame(id){if(correctionSession||nameEditIndex!==null||id===library.activeId)return;const record=library.games.find(r=>r.id===id);if(!record)return;save();library.activeId=id;state=record.game;render()}
-function newGame(){if(correctionSession||nameEditIndex!==null)return;save();const game=fresh(state);const record=makeRecord(game);library.games.push(record);library.activeId=record.id;state=record.game;render()}
+function switchGame(id){if(correctionSession||playerDataEditing||id===library.activeId)return;const record=library.games.find(r=>r.id===id);if(!record)return;save();library.activeId=id;state=record.game;render()}
+function newGame(){if(correctionSession||playerDataEditing)return;save();const game=fresh(state);const record=makeRecord(game);library.games.push(record);library.activeId=record.id;state=record.game;render()}
 
 function player(p){return state[p?'nameB':'nameA'].trim()||'Spieler*in '+(p?'B':'A')}
+function scoringTargetsFor(game){
+if(Array.isArray(game.scoringTargets)&&game.scoringTargets.length===2&&game.scoringTargets.every(v=>[18,19,20].includes(v)))return game.scoringTargets;
+if([18,19,20].includes(game.scoringTarget))return [game.scoringTarget,game.scoringTarget];
+return [20,20];
+}
 function render(){
 for(const id of ['nameA','nameB'])document.getElementById(id).value=state[id];
+refreshScoringTarget();
 const container=document.getElementById('disciplines');
 container.replaceChildren();
 kinds.forEach((k,idx)=>{
 const sec=document.createElement('section');
 sec.innerHTML='<div class="section-head"><span class="num">0'+(idx+1)+'</span><h2>'+disciplineNames[idx]+'</h2><span class="hint">'+disciplineHints[idx]+'</span></div><details class="discipline-help"><summary>Ablauf &amp; Ziel</summary><p>'+disciplineExplanations[idx]+'</p></details><div class="discipline-actions" data-actions-for="'+k+'"></div><div class="scroll"><table><thead><tr><th>Spieler*in / '+(k==='scoring'?'Aufnahme':'Ziel')+'</th></tr></thead><tbody></tbody></table></div>';
+if(k==='scoring'){
+const targets=scoringTargetsFor(state);
+sec.querySelector('.hint').textContent='A: '+(targets[0]??'–')+' · B: '+(targets[1]??'–')+' · 0–9 Punkte';
+}
 sec.querySelector('.discipline-help summary').tabIndex=kinds.indexOf(k)*20+1;
 const head=sec.querySelector('tr');
 (k==='scoring'?Array.from({length:10},(_,i)=>i+1):state[k]).forEach(n=>{
@@ -112,7 +128,6 @@ sec.querySelector('tbody').append(tr);
 }
 container.append(sec);
 });
-document.querySelectorAll('.name-edit-button').forEach((button,index)=>{button.onclick=()=>openNameEdit(index)});
 update();
 save();
 }
@@ -126,7 +141,7 @@ if(next){state.lifecycle={status:'active',activeKind:next};queueMicrotask(()=>fo
 else state.lifecycle={status:'completed',activeKind:null};
 }
 }
-refreshNames();refreshCells();renderLifecycleControls();renderDisciplineActions();
+refreshScoringTarget();refreshNames();refreshCells();renderLifecycleControls();renderDisciplineActions();
 const pts=[[],[]];let complete=0;kinds.forEach(k=>{
 const sums=state.scores[k].map(a=>a.reduce((s,n)=>s+(n===''?0:n),0));
 for(let p=0;p<2;p++)document.getElementById(k+p).textContent=sums[p];
@@ -143,11 +158,65 @@ tbody.append(tr);
 }
 const totals=pts.map(a=>a.reduce((s,v)=>s+(v||0),0));
 document.getElementById('result').textContent=complete===3?(totals[0]===totals[1]?'Unentschieden – starkes Match!':player(totals[0]>totals[1]?0:1)+' gewinnt das Match!'):complete+' von 3 Disziplinen abgeschlossen';
-document.getElementById('new').disabled=Boolean(correctionSession);document.getElementById('game-list').disabled=Boolean(correctionSession);document.getElementById('print').disabled=Boolean(correctionSession);document.getElementById('print-results').disabled=Boolean(correctionSession);
+const editing=Boolean(correctionSession||playerDataEditing);
+document.getElementById('new').disabled=editing;document.getElementById('game-list').disabled=editing;document.getElementById('print').disabled=editing;document.getElementById('print-results').disabled=editing;
 }
-for(const id of ['nameA','nameB'])document.getElementById(id).addEventListener('input',e=>{if(lifecycleFor(state).status!=='setup')return;state[id]=e.target.value;document.querySelectorAll('[data-player]').forEach(el=>el.textContent=player(Number(el.dataset.player)));update();save()});
+for(let p=0;p<2;p++){
+const id=p?'nameB':'nameA';
+document.getElementById(id).addEventListener('input',e=>{
+if(lifecycleFor(state).status==='setup'){
+state[id]=e.target.value;
+document.querySelectorAll('[data-player]').forEach(el=>el.textContent=player(Number(el.dataset.player)));
+update();save();
+}
+});
+}
 
-function refreshNames(){const lifecycle=lifecycleFor(state),editable=lifecycle.status==='setup';for(const id of ['nameA','nameB']){const input=document.getElementById(id);input.value=state[id];input.readOnly=!editable}document.querySelectorAll('.name-edit-button').forEach(button=>button.style.display=editable||lifecycle.status==='legacy'?'none':'inline-block')}
+function refreshScoringTarget(){
+const lifecycle=lifecycleFor(state);
+const targets=playerDataEditing?[0,1].map(p=>Number(document.getElementById('scoring-target-'+(p?'B':'A')).value)):scoringTargetsFor(state);
+for(let p=0;p<2;p++){
+const suffix=p?'B':'A',select=document.getElementById('scoring-target-'+suffix);
+if(!playerDataEditing)select.value=targets[p]===null||targets[p]===undefined?'':String(targets[p]);
+select.disabled=!(lifecycle.status==='setup'||playerDataEditing);
+}
+const scoringHint=Array.from(document.querySelectorAll('#disciplines section')).find(section=>section.querySelector('h2')?.textContent==='Scoring')?.querySelector('.hint');
+if(scoringHint){
+scoringHint.textContent='A: '+(targets[0]??'–')+' · B: '+(targets[1]??'–')+' · 0–9 Punkte';
+}
+}
+for(let p=0;p<2;p++){
+const suffix=p?'B':'A';
+document.getElementById('scoring-target-'+suffix).addEventListener('change',e=>{
+if(lifecycleFor(state).status==='setup'){
+const value=e.target.value;
+if(!Array.isArray(state.scoringTargets))state.scoringTargets=[20,20];
+state.scoringTargets[p]=['18','19','20'].includes(value)?Number(value):20;
+save();
+update();
+}else if(playerDataEditing){
+update();
+}
+});
+}
+
+function refreshNames(){
+const lifecycle=lifecycleFor(state);
+for(let p=0;p<2;p++){
+const suffix=p?'B':'A',input=document.getElementById('name'+suffix);
+const card=input.closest('.player-card'),editable=lifecycle.status==='setup'||playerDataEditing;
+if(!playerDataEditing)input.value=state['name'+suffix];
+input.readOnly=!editable;
+card.classList.toggle('is-player-data-editing',playerDataEditing);
+}
+document.querySelectorAll('[data-player]').forEach(el=>{el.textContent=player(Number(el.dataset.player))});
+const actionBar=document.getElementById('player-data-actions');
+const available=lifecycle.status!=='setup'&&lifecycle.status!=='legacy';
+actionBar.hidden=!available;
+document.getElementById('player-data-edit').hidden=!available||playerDataEditing;
+document.getElementById('player-data-save').hidden=!playerDataEditing;
+document.getElementById('player-data-cancel').hidden=!playerDataEditing;
+}
 function refreshCells(){document.querySelectorAll('.score-input').forEach(input=>{
 const k=input.dataset.kind,p=Number(input.dataset.p),i=Number(input.dataset.i),value=state.scores[k][p][i];
 const editable=canEditCell(k,p,i);
@@ -171,6 +240,7 @@ const host=document.getElementById('lifecycle-controls');host.replaceChildren();
 const panel=document.createElement('div'),message=document.createElement('p'),actions=document.createElement('div');
 panel.className='lifecycle-panel';actions.className='lifecycle-actions';panel.append(message,actions);host.append(panel);
 if(correctionSession){message.textContent='Korrektur aktiv – bitte in der Disziplin speichern oder abbrechen.';return}
+if(playerDataEditing){message.textContent='Spielerdaten bearbeiten – bitte speichern oder abbrechen, bevor du fortfährst.';return}
 const lifecycle=lifecycleFor(state);
 if(lifecycle.status==='legacy'){
 message.textContent='Für dieses ältere Spiel ist der Spielstatus unbekannt. Bitte einmal festlegen, bevor du fortfährst.';
@@ -202,14 +272,14 @@ if(next&&disciplineComplete(lifecycle.activeKind)){
 const startNext=document.createElement('button');startNext.className='primary';
 startNext.textContent=disciplineNames[kinds.indexOf(next)]+' starten';
 startNext.onclick=()=>{
-if(correctionSession||!disciplineComplete(lifecycle.activeKind))return;
+if(correctionSession||playerDataEditing||!disciplineComplete(lifecycle.activeKind))return;
 state.lifecycle={status:'active',activeKind:next};save();update();queueMicrotask(()=>focusFirstEntry(next));
 };
 actions.append(startNext);
 }
 }
-function renderDisciplineActions(){kinds.forEach(kind=>{const host=document.querySelector('[data-actions-for="'+kind+'"]');if(!host)return;host.replaceChildren();const lifecycle=lifecycleFor(state),activeIndex=lifecycle.status==='active'?kinds.indexOf(lifecycle.activeKind):-1,kindIndex=kinds.indexOf(kind),status=document.createElement('span');status.className='lifecycle-readonly';if(lifecycle.status==='setup')status.textContent='Noch nicht gestartet';else if(lifecycle.status==='completed')status.textContent='Read-only';else if(lifecycle.status==='active')status.textContent=kindIndex===activeIndex?'Aktiv':kindIndex<activeIndex?'Read-only':'Noch nicht begonnen';else status.textContent='Status festlegen';host.append(status);if(correctionSession){if(correctionSession.kind!==kind)return;const saveButton=document.createElement('button');saveButton.className='primary';saveButton.textContent='Korrektur speichern';saveButton.onclick=saveCorrection;const cancelButton=document.createElement('button');cancelButton.textContent='Abbrechen';cancelButton.onclick=cancelCorrection;host.append(saveButton,cancelButton);return}const lockedPast=lifecycle.status==='completed'||lifecycle.status==='active'&&kindIndex<=activeIndex,hasValues=state.scores[kind].some(row=>row.some(value=>value!==''));if(!lockedPast||!hasValues)return;const edit=document.createElement('button');edit.textContent='✎ Korrigieren';edit.setAttribute('aria-label',disciplineNames[kindIndex]+' korrigieren');edit.onclick=()=>beginCorrection(kind);host.append(edit)})}
-function beginCorrection(kind){if(correctionSession)return;correctionSession={kind,snapshot:state.scores[kind].map(row=>row.slice())};update()}
+function renderDisciplineActions(){kinds.forEach(kind=>{const host=document.querySelector('[data-actions-for="'+kind+'"]');if(!host)return;host.replaceChildren();const lifecycle=lifecycleFor(state),activeIndex=lifecycle.status==='active'?kinds.indexOf(lifecycle.activeKind):-1,kindIndex=kinds.indexOf(kind),status=document.createElement('span');status.className='lifecycle-readonly';if(lifecycle.status==='setup')status.textContent='Noch nicht gestartet';else if(lifecycle.status==='completed')status.textContent='Read-only';else if(lifecycle.status==='active')status.textContent=kindIndex===activeIndex?'Aktiv':kindIndex<activeIndex?'Read-only':'Noch nicht begonnen';else status.textContent='Status festlegen';host.append(status);if(correctionSession){if(correctionSession.kind!==kind)return;const saveButton=document.createElement('button');saveButton.className='primary';saveButton.textContent='Korrektur speichern';saveButton.onclick=saveCorrection;const cancelButton=document.createElement('button');cancelButton.textContent='Abbrechen';cancelButton.onclick=cancelCorrection;host.append(saveButton,cancelButton);return}if(playerDataEditing)return;const lockedPast=lifecycle.status==='completed'||lifecycle.status==='active'&&kindIndex<=activeIndex,hasValues=state.scores[kind].some(row=>row.some(value=>value!==''));if(!lockedPast||!hasValues)return;const edit=document.createElement('button');edit.textContent='✎ Korrigieren';edit.setAttribute('aria-label',disciplineNames[kindIndex]+' korrigieren');edit.onclick=()=>beginCorrection(kind);host.append(edit)})}
+function beginCorrection(kind){if(correctionSession||playerDataEditing)return;correctionSession={kind,snapshot:state.scores[kind].map(row=>row.slice())};update()}
 function reconcileLifecycleAfterCorrection(){
 if(lifecycleFor(state).status==='completed'||isComplete(state)){
 if(isComplete(state)){state.lifecycle={status:'completed',activeKind:null};return}
@@ -234,8 +304,28 @@ save();
 update();
 }
 function cancelCorrection(){if(!correctionSession)return;state.scores[correctionSession.kind]=correctionSession.snapshot;correctionSession=null;update()}
-function openNameEdit(index){if(lifecycleFor(state).status==='setup'||lifecycleFor(state).status==='legacy')return;nameEditIndex=index;document.getElementById('name-dialog-input').value=state[index?'nameB':'nameA'];document.getElementById('name-dialog-label').firstChild.textContent=player(index)+' – Namen korrigieren';document.getElementById('name-dialog').showModal();document.getElementById('name-dialog-input').focus()}
-function saveNameEdit(){if(nameEditIndex===null)return;state[nameEditIndex?'nameB':'nameA']=document.getElementById('name-dialog-input').value;nameEditIndex=null;document.getElementById('name-dialog').close();update();save()}
+function beginPlayerDataEdit(){
+if(playerDataEditing||correctionSession||lifecycleFor(state).status==='setup'||lifecycleFor(state).status==='legacy')return;
+playerDataEditing=true;
+update();
+const input=document.getElementById('nameA');
+input.focus();input.select();
+}
+function savePlayerData(){
+if(!playerDataEditing)return;
+const targets=['A','B'].map(suffix=>document.getElementById('scoring-target-'+suffix).value);
+if(!targets.every(value=>['18','19','20'].includes(value)))return;
+state.nameA=document.getElementById('nameA').value;
+state.nameB=document.getElementById('nameB').value;
+state.scoringTargets=targets.map(Number);
+playerDataEditing=false;
+update();save();document.getElementById('player-data-edit').focus();
+}
+function cancelPlayerDataEdit(){
+if(!playerDataEditing)return;
+playerDataEditing=false;
+update();document.getElementById('player-data-edit').focus();
+}
 function nextEntry(k,p,i){if(p===0)return {k,p:1,i};if(i<9)return {k,p:0,i:i+1};const next=kinds[kinds.indexOf(k)+1];return next?{k:next,p:0,i:0}:null}
 function focusNext(k,p,i){const n=nextEntry(k,p,i);if(!n)return;const input=Array.from(document.querySelectorAll('.score-input')).find(el=>el.dataset.kind===n.k&&Number(el.dataset.p)===n.p&&Number(el.dataset.i)===n.i);if(input&&(input.disabled||input.readOnly))return;if(input){input.focus();if(input.type==='number')input.select()}}
 function focusFirstEntry(kind){
@@ -254,20 +344,25 @@ focusNext(kind,p,index);
 }
 
 let pendingDeleteId=null;
-function askDelete(id){if(correctionSession||nameEditIndex!==null)return;const r=library.games.find(r=>r.id===id);if(!r)return;pendingDeleteId=id;document.getElementById('delete-description').textContent=(r.game.nameA.trim()||'Spieler*in A')+' gegen '+(r.game.nameB.trim()||'Spieler*in B')+' · Start: '+formatTime(r.startedAt);document.getElementById('delete-error').textContent='';document.getElementById('delete-dialog').showModal();document.getElementById('delete-cancel').focus()}
-function deleteGame(){if(correctionSession||nameEditIndex!==null)return;const id=pendingDeleteId;if(!id||!library.games.some(r=>r.id===id))return;const games=library.games.filter(r=>r.id!==id);if(!games.length)games.push(makeRecord(fresh()));const activeId=games.some(r=>r.id===library.activeId)?library.activeId:games[0].id;const next={activeId,games};try{localStorage.setItem(LIBRARY_KEY,JSON.stringify(next));localStorage.removeItem(KEY)}catch{document.getElementById('delete-error').textContent='Löschen konnte nicht gespeichert werden. Bitte erneut versuchen.';return}library=next;state=games.find(r=>r.id===activeId).game;pendingDeleteId=null;document.getElementById('delete-dialog').close();render()}
+function askDelete(id){if(correctionSession||playerDataEditing)return;const r=library.games.find(r=>r.id===id);if(!r)return;pendingDeleteId=id;document.getElementById('delete-description').textContent=(r.game.nameA.trim()||'Spieler*in A')+' gegen '+(r.game.nameB.trim()||'Spieler*in B')+' · Start: '+formatTime(r.startedAt);document.getElementById('delete-error').textContent='';document.getElementById('delete-dialog').showModal();document.getElementById('delete-cancel').focus()}
+function deleteGame(){if(correctionSession||playerDataEditing)return;const id=pendingDeleteId;if(!id||!library.games.some(r=>r.id===id))return;const games=library.games.filter(r=>r.id!==id);if(!games.length)games.push(makeRecord(fresh()));const activeId=games.some(r=>r.id===library.activeId)?library.activeId:games[0].id;const next={activeId,games};try{localStorage.setItem(LIBRARY_KEY,JSON.stringify(next));localStorage.removeItem(KEY)}catch{document.getElementById('delete-error').textContent='Löschen konnte nicht gespeichert werden. Bitte erneut versuchen.';return}library=next;state=games.find(r=>r.id===activeId).game;pendingDeleteId=null;document.getElementById('delete-dialog').close();render()}
 document.getElementById('delete-cancel').onclick=()=>{pendingDeleteId=null;document.getElementById('delete-dialog').close()};
 document.getElementById('delete-dialog').addEventListener('cancel',()=>{pendingDeleteId=null});
 document.getElementById('delete-confirm').onclick=deleteGame;
-document.getElementById('name-dialog-save').onclick=saveNameEdit;
-document.getElementById('name-dialog').addEventListener('close',()=>{nameEditIndex=null});
-document.getElementById('name-dialog-input').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();saveNameEdit()}});
+for(const id of ['nameA','nameB'])document.getElementById(id).addEventListener('keydown',e=>{
+if(!playerDataEditing)return;
+if(e.key==='Enter'){e.preventDefault();savePlayerData()}
+if(e.key==='Escape'){e.preventDefault();cancelPlayerDataEdit()}
+});
 
+document.getElementById('player-data-edit').onclick=beginPlayerDataEdit;
+document.getElementById('player-data-save').onclick=savePlayerData;
+document.getElementById('player-data-cancel').onclick=cancelPlayerDataEdit;
 document.getElementById('new').onclick=newGame;
 document.getElementById('game-list').addEventListener('change',e=>switchGame(e.target.value));
-document.getElementById('print').onclick=()=>{if(correctionSession||nameEditIndex!==null)return;document.body.classList.remove('print-results');window.print()};
+document.getElementById('print').onclick=()=>{if(correctionSession||playerDataEditing)return;document.body.classList.remove('print-results');window.print()};
 document.getElementById('print-results').onclick=()=>{
-if(correctionSession||nameEditIndex!==null)return;
+if(correctionSession||playerDataEditing)return;
 const cleanup=()=>document.body.classList.remove('print-results');
 document.body.classList.add('print-results');
 window.addEventListener('afterprint',cleanup,{once:true});
