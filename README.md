@@ -36,6 +36,10 @@ For testing through a local web server, open the root `index.html` in VS Code, r
 
 Training results are currently stored locally in the browser on the device being used. They are not synchronized across devices.
 
+## Back up and restore games
+
+Use **Daten exportieren** to download a versioned JSON backup of all saved games, including solo and two-player games. **Daten importieren** validates the complete file and previews how many games will be added or skipped before applying it. Games are added by ID; existing games are never overwritten, and duplicate IDs are skipped. Invalid or unsupported backup files do not change saved data.
+
 ## Guided 10–10–10 mode
 
 Select **Geführt spielen** in the 10–10–10 match to enter scores in a full-screen, touch-friendly view. The task order is deterministic: Singles, Scoring, then Checkouts; for each of the ten targets or turns, Player A enters a value followed by Player B, before moving to the next task. Progress counts the ten tasks in the current discipline, with both players sharing each task. Entries use the same saved match data as the score table, results list, and print views.

@@ -1,5 +1,5 @@
 'use strict';
-const KEY='darts-challenge-v1', LIBRARY_KEY='darts-challenge-games-v1', kinds=['rtw','scoring','checkout'];
+const KEY='darts-challenge-v1', LIBRARY_KEY='darts-challenge-games-v1', BACKUP_FORMAT='darts-trainings-backup', BACKUP_VERSION=1, kinds=['rtw','scoring','checkout'];
 const disciplineNames=['Singles','Scoring','Checkouts'];
 const disciplineHints=['0–3 Punkte pro Zahl','0–9 Punkte pro Aufnahme','? Offen · ✓ Getroffen · ✕ Nicht getroffen'];
 const disciplineExplanations=[
@@ -10,6 +10,16 @@ const disciplineExplanations=[
 function draw(min,max,n){const a=Array.from({length:max-min+1},(_,i)=>i+min);for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a.slice(0,n)}
 function fresh(names={},mode='duo'){return {mode,checkoutStateVersion:2,nameA:names.nameA||'',nameB:mode==='solo'?'':names.nameB||'',scoringTargets:[20,20],rtw:draw(1,20,10),checkout:draw(41,60,10),lifecycle:{status:'setup',activeKind:null},scores:Object.fromEntries(kinds.map(k=>[k,[Array(10).fill(''),Array(10).fill('')]]))}}
 function valid(s){return s&&['rtw','checkout'].every(k=>Array.isArray(s[k])&&s[k].length===10&&new Set(s[k]).size===10&&s[k].every(n=>Number.isInteger(n)&&n>=(k==='rtw'?1:41)&&n<=(k==='rtw'?20:60)))&&kinds.every(k=>Array.isArray(s.scores?.[k])&&s.scores[k].length===2&&s.scores[k].every(a=>Array.isArray(a)&&a.length===10&&a.every(v=>v===''||Number.isInteger(v)&&v>=0&&v<=999)))&&['nameA','nameB'].every(k=>typeof s[k]==='string')&&(s.mode===undefined||s.mode==='solo'||s.mode==='duo')&&(s.scoringTargets===undefined||Array.isArray(s.scoringTargets)&&s.scoringTargets.length===2&&s.scoringTargets.every(v=>v===null||[18,19,20].includes(v)))&&(s.scoringTarget===undefined||s.scoringTarget===null||[18,19,20].includes(s.scoringTarget))}
+function validTimestamp(value){return typeof value==='string'&&Number.isFinite(Date.parse(value))}
+function validBackup(data){
+if(!data||data.format!==BACKUP_FORMAT||data.version!==BACKUP_VERSION||!validTimestamp(data.exportedAt)||!Array.isArray(data.games)||!data.games.length||typeof data.activeId!=='string')return false;
+const ids=new Set();
+for(const record of data.games){
+if(!record||typeof record.id!=='string'||!record.id.trim()||ids.has(record.id)||!validTimestamp(record.createdAt)||!validTimestamp(record.updatedAt)||!validTimestamp(record.startedAt)||(record.endedAt!==null&&!validTimestamp(record.endedAt))||typeof record.wasComplete!=='boolean'||!valid(record.game))return false;
+ids.add(record.id);
+}
+return ids.has(data.activeId);
+}
 
 function playerCount(game){return game.mode==='solo'?1:2}
 function isComplete(game){return kinds.every(k=>game.scores[k].slice(0,playerCount(game)).every(row=>row.every(v=>v!=='')))}
@@ -35,12 +45,63 @@ game.scoringTargets=[legacy,legacy];
 }
 function normalizeGame(game){if(game.mode===undefined)game.mode='duo';normalizeScoringTargets(game)}
 function loadLibrary(){try{const data=JSON.parse(localStorage.getItem(LIBRARY_KEY));if(data&&Array.isArray(data.games)){const games=data.games.filter(r=>r&&typeof r.id==='string'&&typeof r.createdAt==='string'&&typeof r.updatedAt==='string'&&valid(r.game));if(games.length){games.forEach(r=>normalizeGame(r.game));return {activeId:games.some(r=>r.id===data.activeId)?data.activeId:games[0].id,games}}}}catch{}let old;try{old=JSON.parse(localStorage.getItem(KEY))}catch{}const oldGame=valid(old)?old:fresh();normalizeGame(oldGame);const record=makeRecord(oldGame);return {activeId:record.id,games:[record]}}
-let library=loadLibrary(),state=library.games.find(r=>r.id===library.activeId).game,correctionSession=null,playerDataEditing=false,guidedStep=null;
+let library=loadLibrary(),state=library.games.find(r=>r.id===library.activeId).game,correctionSession=null,playerDataEditing=false,guidedStep=null,pendingImport=null;
 for(const r of library.games){r.startedAt=r.startedAt||r.createdAt;if(typeof r.wasComplete!=='boolean')r.wasComplete=isComplete(r.game);r.endedAt=r.endedAt||null;}
 function save(){if(correctionSession)return;const record=library.games.find(r=>r.id===library.activeId);record.game=state;record.updatedAt=new Date().toISOString();const done=isComplete(state);if(done&&!record.wasComplete)record.endedAt=record.updatedAt;if(!done)record.endedAt=null;record.wasComplete=done;try{localStorage.setItem(LIBRARY_KEY,JSON.stringify(library));document.getElementById('status').textContent='✓ '+library.games.length+' Spiel'+(library.games.length===1?'':'e')+' lokal gespeichert'}catch{document.getElementById('status').textContent='Speichern fehlgeschlagen – Ergebnisse bitte drucken'}renderGameList();renderResults()}
 function renderGameList(){const list=document.getElementById('game-list');list.replaceChildren();library.games.forEach((r,index)=>{const g=r.game,done=isComplete(g),option=document.createElement('option');option.value=r.id;option.textContent='Spiel '+(index+1)+' · '+(g.mode==='solo'?'Solo · '+(g.nameA.trim()||'Spieler*in'): (g.nameA.trim()||'Spieler*in A')+' gegen '+(g.nameB.trim()||'Spieler*in B'))+' · '+new Date(r.createdAt).toLocaleDateString('de-DE')+' · '+(done?'Abgeschlossen':'In Bearbeitung');list.append(option)});list.value=library.activeId;const current=library.games.find(r=>r.id===library.activeId);document.getElementById('game-info').textContent='Start: '+formatTime(current.startedAt)+' · Ende: '+(current.endedAt?formatTime(current.endedAt):isComplete(current.game)?'Nicht erfasst':'Noch offen')+' · '+library.games.length+' gespeicherte Spiele'}
 
 function formatTime(value){return value&&Number.isFinite(Date.parse(value))?new Date(value).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}):'Nicht erfasst'}
+function exportGames(){
+const backup={format:BACKUP_FORMAT,version:BACKUP_VERSION,exportedAt:new Date().toISOString(),activeId:library.activeId,games:library.games};
+const filename='darts-trainings-backup-'+backup.exportedAt.slice(0,10)+'.json';
+try{
+const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
+const url=URL.createObjectURL(blob),link=document.createElement('a');
+link.href=url;link.download=filename;document.body.append(link);link.click();link.remove();
+setTimeout(()=>URL.revokeObjectURL(url),1000);
+document.getElementById('status').textContent='Backup-Download gestartet: '+filename;
+}catch(error){
+if(!(error instanceof DOMException))throw error;
+document.getElementById('status').textContent='Export fehlgeschlagen: '+(error.message||'Der Browser konnte den Download nicht starten.');
+}
+}
+async function previewImport(file){
+const dialog=document.getElementById('import-dialog'),summary=document.getElementById('import-summary'),error=document.getElementById('import-error'),confirm=document.getElementById('import-confirm');
+pendingImport=null;confirm.disabled=true;error.textContent='';summary.textContent='Datei wird geprüft …';
+if(!dialog.open)dialog.showModal();
+let backup;
+try{backup=JSON.parse(await file.text())}
+catch(readError){
+if(!dialog.open)return;
+error.textContent=readError instanceof SyntaxError?'Die Datei enthält kein gültiges JSON.':'Die Datei konnte nicht gelesen werden. Bitte eine gültige JSON-Datei auswählen.';
+summary.textContent=file.name;
+return;
+}
+if(!dialog.open)return;
+if(!validBackup(backup)){
+error.textContent='Die Datei ist kein gültiges oder unterstütztes Darts-Trainings-Backup.';
+summary.textContent=file.name;
+return;
+}
+const games=backup.games.map(record=>{const copy=JSON.parse(JSON.stringify(record));normalizeGame(copy.game);return copy});
+const existingIds=new Set(library.games.map(record=>record.id));
+const newGames=games.filter(record=>!existingIds.has(record.id)),duplicateCount=games.length-newGames.length;
+pendingImport={games:newGames};
+summary.textContent='Datei „'+file.name+'“ enthält '+games.length+' '+(games.length===1?'Spiel':'Spiele')+'. Neu hinzuzufügen: '+newGames.length+'. Bereits vorhanden und übersprungen: '+duplicateCount+'. Bestehende Spiele werden nicht überschrieben.';
+confirm.disabled=newGames.length===0;
+}
+function confirmImport(){
+if(!pendingImport||!pendingImport.games.length)return;
+const next={activeId:library.activeId,games:library.games.concat(pendingImport.games)};
+try{localStorage.setItem(LIBRARY_KEY,JSON.stringify(next))}
+catch{document.getElementById('import-error').textContent='Import fehlgeschlagen: Im Browser ist nicht genügend Speicherplatz verfügbar.';return}
+library=next;
+state=library.games.find(record=>record.id===library.activeId).game;
+pendingImport=null;
+document.getElementById('import-dialog').close();
+document.getElementById('import-file').value='';
+render();
+}
 function resultFor(game){const players=playerCount(game),disciplines=kinds.map(k=>{const scores=game.scores[k].slice(0,players),done=scores.every(row=>row.every(v=>v!=='')),sums=scores.map(row=>row.reduce((a,v)=>a+(v===''?0:v),0));return {done,sums,points:done&&players===2?(sums[0]===sums[1]?[1,1]:sums[0]>sums[1]?[2,0]:[0,2]):[0,0]}});const done=disciplines.every(d=>d.done),totals=players===2?[0,1].map(p=>disciplines.reduce((a,d)=>a+d.points[p],0)):[0,0],trainingTotal=disciplines.reduce((sum,d)=>sum+(d.sums[0]||0),0);return {disciplines,done,totals,trainingTotal}}
 function renderResults(){const body=document.getElementById('results-body');body.replaceChildren();library.games.forEach((r,index)=>{const g=r.game,result=resultFor(g),solo=g.mode==='solo',nameA=g.nameA.trim()||(solo?'Spieler*in':'Spieler*in A'),nameB=g.nameB.trim()||'Spieler*in B';const row=document.createElement('tr');const outcome=!result.done?'In Bearbeitung':solo?'Training abgeschlossen · '+result.trainingTotal+' Punkte':result.totals[0]===result.totals[1]?'Unentschieden':(result.totals[0]>result.totals[1]?nameA:nameB)+' gewinnt';const values=['Spiel '+(index+1)+' · '+(solo?'Solo · '+nameA:nameA+' / '+nameB),formatTime(r.startedAt),r.endedAt?formatTime(r.endedAt):result.done?'Nicht erfasst':'Noch offen',...result.disciplines.map(d=>d.done?d.sums.join(' : '):'–'),solo?'–':result.done?result.totals.join(' : '):'–',outcome];values.forEach(value=>{const td=document.createElement('td');td.textContent=value;row.append(td)});const td=document.createElement('td'),button=document.createElement('button');button.textContent=r.id===library.activeId?'Aktuell':'Anzeigen';button.disabled=r.id===library.activeId;button.onclick=()=>{switchGame(r.id);document.getElementById('game-list').focus()};td.append(button);const remove=document.createElement('button');remove.textContent='Löschen';remove.className='danger';remove.setAttribute('aria-label','Spiel von '+nameA+(solo?'':' und '+nameB)+' löschen');remove.onclick=()=>askDelete(r.id);td.append(remove);row.append(td);body.append(row)})}
 
@@ -174,7 +235,7 @@ document.getElementById('match-summary').querySelector('h2').textContent=solo?'T
 document.querySelector('#match-summary .hint').textContent=solo?'Punkte je Disziplin · Gesamtsumme':'Sieg 2 · Remis 1 · Niederlage 0';
 document.getElementById('result').textContent=complete===3?(solo?'Training abgeschlossen · '+disciplineSums.reduce((sum,value)=>sum+value,0)+' Punkte':totals[0]===totals[1]?'Unentschieden – starkes Match!':player(totals[0]>totals[1]?0:1)+' gewinnt das Match!'):complete+' von 3 Disziplinen abgeschlossen';
 const editing=Boolean(correctionSession||playerDataEditing);
-document.getElementById('new').disabled=editing;document.getElementById('new-game-mode').disabled=editing;document.getElementById('game-list').disabled=editing;document.getElementById('print').disabled=editing;document.getElementById('print-results').disabled=editing;
+document.getElementById('new').disabled=editing;document.getElementById('new-game-mode').disabled=editing;document.getElementById('game-list').disabled=editing;document.getElementById('export-data').disabled=editing;document.getElementById('import-open').disabled=editing;document.getElementById('print').disabled=editing;document.getElementById('print-results').disabled=editing;
 refreshGuidedEntryButton();
 if(document.getElementById('guided-dialog').open)renderGuidedEntry();
 }
@@ -540,6 +601,18 @@ if(choice){event.preventDefault();choice.click()}
 });
 document.getElementById('new').onclick=newGame;
 document.getElementById('game-list').addEventListener('change',e=>switchGame(e.target.value));
+document.getElementById('export-data').onclick=exportGames;
+document.getElementById('import-open').onclick=()=>document.getElementById('import-file').click();
+document.getElementById('import-file').addEventListener('change',event=>{
+const file=event.target.files?.[0];
+if(file)previewImport(file);
+});
+document.getElementById('import-confirm').onclick=confirmImport;
+document.getElementById('import-cancel').onclick=()=>document.getElementById('import-dialog').close();
+document.getElementById('import-dialog').addEventListener('close',()=>{
+pendingImport=null;
+document.getElementById('import-file').value='';
+});
 document.getElementById('print').onclick=()=>{if(correctionSession||playerDataEditing)return;document.body.classList.remove('print-results');window.print()};
 document.getElementById('print-results').onclick=()=>{
 if(correctionSession||playerDataEditing)return;

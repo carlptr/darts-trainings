@@ -18,6 +18,10 @@
 .player-card[hidden],.guided-player[hidden]{display:none}
 .meta.is-solo{grid-template-columns:minmax(0,1fr)}
 .guided-scores.is-solo{grid-template-columns:minmax(0,1fr)}
+#import-dialog{width:min(560px,calc(100vw - 28px));max-width:560px}
+#import-summary{overflow-wrap:anywhere}
+#import-error{color:#ffaaaa}
+#import-error:empty{display:none}
 .meta{width:100%;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:18px}.meta>.player-card{min-width:0}.player-card{display:grid;grid-template-columns:minmax(0,1fr) 150px;align-items:end;gap:12px;min-width:0}.player-name-field>label,.target-label{display:flex;align-items:flex-end;height:28px;margin:0 0 7px}.player-name{display:flex;align-items:center;min-width:0}.player-name input{flex:1;min-width:0;height:43px;margin:0}.target-field{display:flex;flex-direction:column;width:150px;min-width:0}.target-label{font-size:11px;line-height:14px;color:var(--muted);white-space:normal}.scoring-target-control{display:flex;align-items:center;gap:8px;height:43px;margin:0}.scoring-target-control select{font:inherit;color:#f2f5ed;background:#101914;border:1px solid var(--line);border-radius:6px;width:72px;height:43px;min-width:72px;padding:8px}.scoring-target-control select:disabled{color:#8e9891;background:#252a27;opacity:1}.player-card.is-player-data-editing{outline:1px solid var(--line);outline-offset:8px;border-radius:4px}#nameA:read-only,#nameB:read-only{background:#252a27;color:#a7b5a9}.player-data-actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px}.player-data-actions[hidden]{display:none}.player-data-actions button{padding:9px 14px}@media(max-width:650px){.meta{grid-template-columns:minmax(0,1fr)}.player-card{grid-template-columns:minmax(0,1fr) 140px}.target-field{width:140px}.player-data-actions{justify-content:stretch}.player-data-actions button{flex:1}}
 #guided-dialog{width:100vw;height:100vh;height:100dvh;max-width:none;max-height:none;margin:0;padding:clamp(18px,4vw,52px);border:0;border-radius:0;background:var(--bg);overflow:auto}
 #guided-dialog[open]{display:flex;flex-direction:column;gap:clamp(16px,3vh,28px)}
