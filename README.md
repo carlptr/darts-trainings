@@ -42,6 +42,10 @@ Select **Geführt spielen** in the 10–10–10 match to enter scores in a full-
 
 Use the arrow keys to navigate, number keys to choose a score, and Escape to close the overlay. Locked disciplines can only be changed through their explicit correction mode; correction edits must be saved or are discarded when cancelled.
 
+## Solo 10–10–10 mode
+
+Choose **Einzelspieler** as the mode for a new match to record one player's results across Singles, Scoring, and Checkouts. Solo results show the score for each discipline and the combined training score instead of match points. Solo games are saved alongside two-player matches and appear in the game history and print views. Existing games without a saved mode continue to be treated as two-player matches.
+
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
